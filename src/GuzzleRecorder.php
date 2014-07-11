@@ -9,10 +9,17 @@ use GuzzleHttp\Message\Request;
 class GuzzleRecorder implements SubscriberInterface
 {
     private $path;
+    private $include_cookies = true;
 
     public function __construct($path)
     {
         $this->path = $path;
+    }
+
+    public function includeCookies($boolean)
+    {
+        $this->include_cookies = $boolean;
+        return $this;
     }
 
     public function getEvents()
@@ -64,6 +71,15 @@ class GuzzleRecorder implements SubscriberInterface
 
     protected function getFileName(Request $request)
     {
+        $result = trim($request->getMethod() . ' ' . $request->getResource())
+            . ' HTTP/' . $request->getProtocolVersion();
+        foreach ($request->getHeaders() as $name => $values) {
+            if ($name != "Cookie" or $this->include_cookies) {
+                $result .= "\r\n{$name}: " . implode(', ', $values);
+            }
+        }
+
+        $request = $result . "\r\n\r\n" . $request->getBody();
         return md5((string)$request) . ".txt";
     }
 
