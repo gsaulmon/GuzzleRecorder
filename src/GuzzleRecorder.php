@@ -2,6 +2,7 @@
 
 use GuzzleHttp\Event\BeforeEvent;
 use GuzzleHttp\Event\CompleteEvent;
+use GuzzleHttp\Event\RequestEvents;
 use GuzzleHttp\Event\SubscriberInterface;
 use GuzzleHttp\Message\MessageFactory;
 use GuzzleHttp\Message\Request;
@@ -25,7 +26,7 @@ class GuzzleRecorder implements SubscriberInterface
     public function getEvents()
     {
         return [
-            'before' => array('onBefore'),
+            'before' => array('onBefore', RequestEvents::LATE),
             'complete' => array('onComplete'),
         ];
     }
