@@ -1,13 +1,10 @@
 <?php namespace Gsaulmon\GuzzleRecorder;
 
-use GuzzleHttp\Event\BeforeEvent;
-use GuzzleHttp\Event\CompleteEvent;
-use GuzzleHttp\Event\RequestEvents;
-use GuzzleHttp\Event\SubscriberInterface;
-use GuzzleHttp\Message\MessageFactory;
-use GuzzleHttp\Message\Request;
+use GuzzleHttp\Client;
+use GuzzleHttp\HandlerStack;
+use Psr\Http\Message\RequestInterface;
 
-class GuzzleRecorder implements SubscriberInterface
+class GuzzleRecorder
 {
     private $path;
     private $include_cookies = true;
@@ -23,44 +20,60 @@ class GuzzleRecorder implements SubscriberInterface
         return $this;
     }
 
-    public function getEvents()
+    public function attach_to(Client $client)
     {
-        return [
-            'before' => array('onBefore', RequestEvents::LATE),
-            'complete' => array('onComplete'),
-        ];
+        /** @var HandlerStack $stack */
+        $stack = $client->getConfig('handler');
+        $stack->push($this->onBefore());
+        $stack->unshift($this->onComplete());
     }
 
-    public function onBefore(BeforeEvent $event)
-    {
-        $request = $event->getRequest();
 
-        if (file_exists($this->getFullFilePath($request))) {
-            $responsedata = file_get_contents($this->getFullFilePath($request));
-            $mf = new MessageFactory();
-            $event->intercept($mf->fromMessage($responsedata));
-        }
+    public function onBefore()
+    {
+        return function (callable $handler) {
+            return function (RequestInterface $request, array $options) use ($handler) {
+                $promise = $handler($request, $options);
+
+                if (file_exists($this->getFullFilePath($request))) {
+                    $responsedata = file_get_contents($this->getFullFilePath($request));
+                    $response = \GuzzleHttp\Psr7\parse_response($responsedata);
+                    $promise->resolve($response);
+
+                }
+
+                return $promise;
+            };
+        };
     }
 
-    public function onComplete(CompleteEvent $event)
+    public function onComplete()
     {
-        $request = $event->getRequest();
+        return function (callable $handler) {
+            return function ($request, array $options) use ($handler) {
+                return $handler($request, $options)->then(
+                    function ($response) use ($request) {
+                        if (!file_exists($this->getPath($request))) {
+                            mkdir($this->getPath($request), 0777, true);
+                        }
 
-        if (!file_exists($this->getPath($request))) {
-            mkdir($this->getPath($request), 0777, true);
-        }
+                        if(!file_exists($this->getFullFilePath($request))) {
+                            file_put_contents($this->getFullFilePath($request), \GuzzleHttp\Psr7\str($response));
+                        }
 
-        $response = $event->getResponse();
-
-        file_put_contents($this->getFullFilePath($request), (string)$response);
+                        return $response;
+                    }
+                );
+            };
+        };
     }
 
-    protected function getPath(Request $request)
+    protected function getPath(RequestInterface $request)
     {
-        $path = $this->path . DIRECTORY_SEPARATOR . strtolower($request->getMethod()) . DIRECTORY_SEPARATOR . $request->getHost() . DIRECTORY_SEPARATOR;
+        $path = $this->path . DIRECTORY_SEPARATOR . strtolower($request->getMethod()) . DIRECTORY_SEPARATOR . $request->getUri()->getHost() . DIRECTORY_SEPARATOR;
 
-        if ($request->getPath() !== '/') {
-            $rpath = $request->getPath();
+        if ($request->getRequestTarget() !== '/') {
+            $rpath = $request->getRequestTarget();
             $rpath = (substr($rpath, 0, 1) === '/') ? substr($rpath, 1) : $rpath;
             $rpath = (substr($rpath, -1, 1) === '/') ? substr($rpath, 0, -1) : $rpath;
 
@@ -70,9 +83,9 @@ class GuzzleRecorder implements SubscriberInterface
         return $path;
     }
 
-    protected function getFileName(Request $request)
+    protected function getFileName(RequestInterface $request)
     {
-        $result = trim($request->getMethod() . ' ' . $request->getResource())
+        $result = trim($request->getMethod() . ' ' . $request->getRequestTarget())
             . ' HTTP/' . $request->getProtocolVersion();
         foreach ($request->getHeaders() as $name => $values) {
             if ($name != "Cookie" or $this->include_cookies) {
@@ -84,7 +97,7 @@ class GuzzleRecorder implements SubscriberInterface
         return md5((string)$request) . ".txt";
     }
 
-    protected function getFullFilePath(Request $request)
+    protected function getFullFilePath(RequestInterface $request)
     {
         return $this->getPath($request) . $this->getFileName($request);
     }

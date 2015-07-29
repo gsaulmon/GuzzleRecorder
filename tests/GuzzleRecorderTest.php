@@ -1,9 +1,7 @@
 <?php
 
 use \Gsaulmon\GuzzleRecorder\GuzzleRecorder;
-use GuzzleHttp\Event\BeforeEvent;
-use GuzzleHttp\Message\Request;
-use GuzzleHttp\Transaction;
+use GuzzleHttp\Psr7\Request;
 
 class GuzzleRecorderTest extends PHPUnit_Framework_TestCase
 {
@@ -22,7 +20,7 @@ class GuzzleRecorderTest extends PHPUnit_Framework_TestCase
         ]);
 
         $this->recorder = new GuzzleRecorder(__DIR__ . '/responses');
-        $this->client->getEmitter()->attach($this->recorder);
+        $this->recorder->attach_to($this->client);
     }
 
     /** @test */

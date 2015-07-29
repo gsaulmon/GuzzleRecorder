@@ -11,7 +11,7 @@ Attach an instance of the recorder to any Guzzle Client
 $client = new GuzzleHttp\Client();
 
 $watcher = new Gsaulmon\GuzzleRecorder\GuzzleRecorder(__DIR__ . '/my_test_responses');
-$client->getEmitter()->attach($watcher);
+$watcher->attach_to($client);
 
 ```
 
