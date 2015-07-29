@@ -1,7 +1,7 @@
 GuzzleRecorder
 ==============
 
-This is an event listener plugin for Guzzle 4/5 aimed at setting up tests for complex responses a bit quicker.
+This is an event listener plugin for Guzzle 6 aimed at setting up tests for complex responses a bit quicker.
 
 ### Usage
 
