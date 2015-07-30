@@ -25,7 +25,7 @@ class GuzzleRecorder
         /** @var HandlerStack $stack */
         $stack = $client->getConfig('handler');
         $stack->push($this->onBefore());
-        $stack->unshift($this->onComplete());
+        $stack->push($this->onComplete());
     }
 
 
