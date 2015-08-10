@@ -11,15 +11,34 @@ class GuzzleRecorder implements SubscriberInterface
 {
     private $path;
     private $include_cookies = true;
+    private $ignored_headers = array();
 
     public function __construct($path)
     {
         $this->path = $path;
     }
 
+    public function getIgnoredHeaders()
+    {
+        return array_values($this->ignored_headers);
+    }
+
+    public function addIgnoredHeader($name)
+    {
+        $this->ignored_headers[strtoupper($name)] = $name;
+        return $this;
+    }
+
     public function includeCookies($boolean)
     {
         $this->include_cookies = $boolean;
+        if ($boolean) {
+            $this->addIgnoredHeader('Cookie');
+        } else {
+            if (array_key_exists('COOKIE', $this->ignored_headers)) {
+                unset($this->ignored_headers['COOKIE']);
+            }
+        }
         return $this;
     }
 
@@ -75,9 +94,10 @@ class GuzzleRecorder implements SubscriberInterface
         $result = trim($request->getMethod() . ' ' . $request->getResource())
             . ' HTTP/' . $request->getProtocolVersion();
         foreach ($request->getHeaders() as $name => $values) {
-            if ($name != "Cookie" or $this->include_cookies) {
-                $result .= "\r\n{$name}: " . implode(', ', $values);
+            if (array_key_exists(strtoupper($name), $this->ignored_headers)) {
+                continue;
             }
+            $result .= "\r\n{$name}: " . implode(', ', $values);
         }
 
         $request = $result . "\r\n\r\n" . $request->getBody();
