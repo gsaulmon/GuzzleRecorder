@@ -32,7 +32,7 @@ class GuzzleRecorder implements SubscriberInterface
     public function includeCookies($boolean)
     {
         $this->include_cookies = $boolean;
-        if ($boolean) {
+        if (!$boolean) {
             $this->addIgnoredHeader('Cookie');
         } else {
             if (array_key_exists('COOKIE', $this->ignored_headers)) {
