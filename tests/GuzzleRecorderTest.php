@@ -1,7 +1,7 @@
 <?php
 
-use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\HandlerStack;
+use GuzzleHttp\Psr7\Request;
 use Gsaulmon\GuzzleRecorder\GuzzleRecorder;
 
 class GuzzleRecorderTest extends PHPUnit_Framework_TestCase
@@ -16,8 +16,7 @@ class GuzzleRecorderTest extends PHPUnit_Framework_TestCase
     {
         $this->recorder = new GuzzleRecorder(__DIR__ . '/responses');
 
-        $stack = HandlerStack::create();
-        $stack->push($this->recorder->record());
+        $stack = HandlerStack::create($this->recorder);
 
         $this->client = new GuzzleHttp\Client([
             'defaults' => [
