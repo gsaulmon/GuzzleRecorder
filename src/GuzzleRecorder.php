@@ -104,19 +104,19 @@ class GuzzleRecorder
         return $response->then(
             function ($value) use ($request, $options) {
                 // record the response
-                $this->recordResponse($request, $value);
+                $this->record($request, $value);
 
                 return $value;
             },
             function ($reason) use ($request, $options) {
                 // record the response
-                $this->recordResponse($request, $reason);
+                $this->record($request, $reason);
 
                 return $reason;
         });
     }
 
-    public function recordResponse($response, $request)
+    public function record($request, $response)
     {
         $this->history[] = $response;
 
