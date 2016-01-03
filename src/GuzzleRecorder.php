@@ -8,15 +8,15 @@ use GuzzleHttp\Promise\RejectedPromise;
 class GuzzleRecorder
 {
     private $path;
+    public $history;
+
     private $include_cookies = true;
     private $ignored_headers = array();
-    public $lastRequest = null;
-    public $lastOptions = null;
-    public $history = array();
 
-    public function __construct($path)
+    public function __construct($path, &$history = [])
     {
         $this->path = $path;
+        $this->history =& $history;
     }
 
     public function getIgnoredHeaders()
@@ -87,9 +87,6 @@ class GuzzleRecorder
             usleep($options['delay'] * 1000);
         }
 
-        $this->lastRequest = $request;
-        $this->lastOptions = $options;
-
         if (file_exists($this->getFullFilePath($request))) {
             $responseData = file_get_contents($this->getFullFilePath($request));
 
@@ -104,23 +101,28 @@ class GuzzleRecorder
         return $response->then(
             function ($value) use ($request, $options) {
                 // record the response
-                $this->record($request, $value);
+                $this->record($request, $value, null, $options);
 
                 return $value;
             },
             function ($reason) use ($request, $options) {
                 // record the response
-                $this->record($request, $reason);
+                $this->record($request, null, $reason, $options);
 
                 return $reason;
         });
     }
 
-    public function record($request, $response)
+    public function record($request, $response, $error, $options)
     {
-        $this->history[] = $response;
+        $this->history[] = [
+            'request'  => $request,
+            'response' => $response,
+            'error'    => $error,
+            'options'  => $options
+        ];
 
-        if (!file_exists($this->getPath($request))) {
+        if (!file_exists($this->getPath($request)) && $response) {
             mkdir($this->getPath($request), 0777, true);
 
             file_put_contents($this->getFullFilePath($request), (string)$response);
