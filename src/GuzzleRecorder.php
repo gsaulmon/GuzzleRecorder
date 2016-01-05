@@ -1,21 +1,22 @@
 <?php namespace Gsaulmon\GuzzleRecorder;
 
-use GuzzleHttp\Event\BeforeEvent;
-use GuzzleHttp\Event\CompleteEvent;
-use GuzzleHttp\Event\RequestEvents;
-use GuzzleHttp\Event\SubscriberInterface;
-use GuzzleHttp\Message\MessageFactory;
-use GuzzleHttp\Message\Request;
+use GuzzleHttp\Psr7;
+use GuzzleHttp\Handler\CurlHandler;
+use Psr\Http\Message\RequestInterface;
+use GuzzleHttp\Promise\RejectedPromise;
 
-class GuzzleRecorder implements SubscriberInterface
+class GuzzleRecorder
 {
     private $path;
+    public $history;
+
     private $include_cookies = true;
     private $ignored_headers = array();
 
-    public function __construct($path)
+    public function __construct($path, &$history = [])
     {
         $this->path = $path;
+        $this->history =& $history;
     }
 
     public function getIgnoredHeaders()
@@ -42,44 +43,13 @@ class GuzzleRecorder implements SubscriberInterface
         return $this;
     }
 
-    public function getEvents()
+    protected function getPath(RequestInterface $request)
     {
-        return [
-            'before' => array('onBefore', RequestEvents::LATE),
-            'complete' => array('onComplete'),
-        ];
-    }
+        $path = $this->path . DIRECTORY_SEPARATOR . strtolower($request->getMethod()) . DIRECTORY_SEPARATOR . $request->getUri()->getHost() . DIRECTORY_SEPARATOR;
 
-    public function onBefore(BeforeEvent $event)
-    {
-        $request = $event->getRequest();
+        $rpath = $request->getUri()->getPath();
 
-        if (file_exists($this->getFullFilePath($request))) {
-            $responsedata = file_get_contents($this->getFullFilePath($request));
-            $mf = new MessageFactory();
-            $event->intercept($mf->fromMessage($responsedata));
-        }
-    }
-
-    public function onComplete(CompleteEvent $event)
-    {
-        $request = $event->getRequest();
-
-        if (!file_exists($this->getPath($request))) {
-            mkdir($this->getPath($request), 0777, true);
-        }
-
-        $response = $event->getResponse();
-
-        file_put_contents($this->getFullFilePath($request), (string)$response);
-    }
-
-    protected function getPath(Request $request)
-    {
-        $path = $this->path . DIRECTORY_SEPARATOR . strtolower($request->getMethod()) . DIRECTORY_SEPARATOR . $request->getHost() . DIRECTORY_SEPARATOR;
-
-        if ($request->getPath() !== '/') {
-            $rpath = $request->getPath();
+        if ($rpath && $rpath !== '/') {
             $rpath = (substr($rpath, 0, 1) === '/') ? substr($rpath, 1) : $rpath;
             $rpath = (substr($rpath, -1, 1) === '/') ? substr($rpath, 0, -1) : $rpath;
 
@@ -89,9 +59,10 @@ class GuzzleRecorder implements SubscriberInterface
         return $path;
     }
 
-    protected function getFileName(Request $request)
+    protected function getFileName(RequestInterface $request)
     {
-        $result = trim($request->getMethod() . ' ' . $request->getResource())
+
+        $result = trim($request->getMethod() . ' ' . $request->getRequestTarget())
             . ' HTTP/' . $request->getProtocolVersion();
         foreach ($request->getHeaders() as $name => $values) {
             if (array_key_exists(strtoupper($name), $this->ignored_headers)) {
@@ -104,8 +75,57 @@ class GuzzleRecorder implements SubscriberInterface
         return md5((string)$request) . ".txt";
     }
 
-    protected function getFullFilePath(Request $request)
+    protected function getFullFilePath(RequestInterface $request)
     {
         return $this->getPath($request) . $this->getFileName($request);
+    }
+
+
+    public function __invoke(RequestInterface $request, array $options)
+    {
+        if (isset($options['delay'])) {
+            usleep($options['delay'] * 1000);
+        }
+
+        if (file_exists($this->getFullFilePath($request))) {
+            $responseData = file_get_contents($this->getFullFilePath($request));
+
+            $response = Psr7\parse_response($responseData);
+        } else {
+            $curlHandler = new CurlHandler();
+            $response = $curlHandler->__invoke($request, $options);
+        }
+
+        $response = $response instanceof \Exception ? new RejectedPromise($response) : \GuzzleHttp\Promise\promise_for($response);
+
+        return $response->then(
+            function ($value) use ($request, $options) {
+                // record the response
+                $this->record($request, $value, null, $options);
+
+                return $value;
+            },
+            function ($reason) use ($request, $options) {
+                // record the response
+                $this->record($request, null, $reason, $options);
+
+                return $reason;
+        });
+    }
+
+    public function record($request, $response, $error, $options)
+    {
+        $this->history[] = [
+            'request'  => $request,
+            'response' => $response,
+            'error'    => $error,
+            'options'  => $options
+        ];
+
+        if (!file_exists($this->getPath($request)) && $response) {
+            mkdir($this->getPath($request), 0777, true);
+
+            file_put_contents($this->getFullFilePath($request), (string)$response);
+        }
     }
 }

@@ -1,28 +1,31 @@
 <?php
 
-use \Gsaulmon\GuzzleRecorder\GuzzleRecorder;
-use GuzzleHttp\Event\BeforeEvent;
-use GuzzleHttp\Message\Request;
-use GuzzleHttp\Transaction;
+use GuzzleHttp\HandlerStack;
+use GuzzleHttp\Psr7\Request;
+use Gsaulmon\GuzzleRecorder\GuzzleRecorder;
 
 class GuzzleRecorderTest extends PHPUnit_Framework_TestCase
 {
     /** @var GuzzleHttp\Client $client */
     private $client = null;
+
+    /** @var GuzzleRecorder $recorder */
     private $recorder = null;
 
     public function setup()
     {
+        $this->recorder = new GuzzleRecorder(__DIR__ . '/responses');
+
+        $stack = HandlerStack::create($this->recorder);
+
         $this->client = new GuzzleHttp\Client([
             'defaults' => [
                 'headers' => [
                     'User-Agent' => 'GuzzleRecorder'
                 ]
-            ]
+            ],
+            'handler' => $stack
         ]);
-
-        $this->recorder = new GuzzleRecorder(__DIR__ . '/responses');
-        $this->client->getEmitter()->attach($this->recorder);
     }
 
     /** @test */
