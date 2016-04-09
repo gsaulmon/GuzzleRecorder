@@ -73,7 +73,7 @@ class GuzzleRecorder
         $path = $this->path . DIRECTORY_SEPARATOR . strtolower($request->getMethod()) . DIRECTORY_SEPARATOR . $request->getUri()->getHost() . DIRECTORY_SEPARATOR;
 
         if ($request->getRequestTarget() !== '/') {
-            $rpath = $request->getRequestTarget();
+            $rpath = $request->getUri()->getPath();
             $rpath = (substr($rpath, 0, 1) === '/') ? substr($rpath, 1) : $rpath;
             $rpath = (substr($rpath, -1, 1) === '/') ? substr($rpath, 0, -1) : $rpath;
 
