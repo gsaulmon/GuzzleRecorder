@@ -58,7 +58,6 @@ class GuzzleRecorder
                     $responsedata = file_get_contents($this->getFullFilePath($request));
                     $response = \GuzzleHttp\Psr7\parse_response($responsedata);
                     $promise->resolve($response);
-
                 }
 
                 return $promise;
@@ -91,7 +90,7 @@ class GuzzleRecorder
     {
         $path = $this->path . DIRECTORY_SEPARATOR . strtolower($request->getMethod()) . DIRECTORY_SEPARATOR . $request->getUri()->getHost() . DIRECTORY_SEPARATOR;
 
-        if ($request->getRequestTarget() !== '/') {
+        if ($request->getUri()->getPath() !== '/') {
             $rpath = $request->getUri()->getPath();
             $rpath = (substr($rpath, 0, 1) === '/') ? substr($rpath, 1) : $rpath;
             $rpath = (substr($rpath, -1, 1) === '/') ? substr($rpath, 0, -1) : $rpath;
@@ -114,11 +113,13 @@ class GuzzleRecorder
         }
 
         $request = $result . "\r\n\r\n" . $request->getBody();
-        return md5((string)$request) . ".txt";
+        $hash = md5((string)$request) . ".txt";
+        return $hash;
     }
 
     protected function getFullFilePath(RequestInterface $request)
     {
-        return $this->getPath($request) . $this->getFileName($request);
+        $fullFilePath = $this->getPath($request) . $this->getFileName($request);
+        return $fullFilePath;
     }
 }
