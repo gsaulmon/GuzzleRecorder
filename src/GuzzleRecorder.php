@@ -8,15 +8,34 @@ class GuzzleRecorder
 {
     private $path;
     private $include_cookies = true;
+    private $ignored_headers = array();
 
     public function __construct($path)
     {
         $this->path = $path;
     }
 
+    public function getIgnoredHeaders()
+    {
+        return array_values($this->ignored_headers);
+    }
+
+    public function addIgnoredHeader($name)
+    {
+        $this->ignored_headers[strtoupper($name)] = $name;
+        return $this;
+    }
+
     public function includeCookies($boolean)
     {
         $this->include_cookies = $boolean;
+        if (!$boolean) {
+            $this->addIgnoredHeader('Cookie');
+        } else {
+            if (array_key_exists('COOKIE', $this->ignored_headers)) {
+                unset($this->ignored_headers['COOKIE']);
+            }
+        }
         return $this;
     }
 
@@ -39,7 +58,6 @@ class GuzzleRecorder
                     $responsedata = file_get_contents($this->getFullFilePath($request));
                     $response = \GuzzleHttp\Psr7\parse_response($responsedata);
                     $promise->resolve($response);
-
                 }
 
                 return $promise;
@@ -73,7 +91,7 @@ class GuzzleRecorder
         $path = $this->path . DIRECTORY_SEPARATOR . strtolower($request->getMethod()) . DIRECTORY_SEPARATOR . $request->getUri()->getHost() . DIRECTORY_SEPARATOR;
 
         if ($request->getRequestTarget() !== '/') {
-            $rpath = $request->getRequestTarget();
+            $rpath = $request->getUri()->getPath();
             $rpath = (substr($rpath, 0, 1) === '/') ? substr($rpath, 1) : $rpath;
             $rpath = (substr($rpath, -1, 1) === '/') ? substr($rpath, 0, -1) : $rpath;
 
@@ -88,17 +106,20 @@ class GuzzleRecorder
         $result = trim($request->getMethod() . ' ' . $request->getRequestTarget())
             . ' HTTP/' . $request->getProtocolVersion();
         foreach ($request->getHeaders() as $name => $values) {
-            if ($name != "Cookie" or $this->include_cookies) {
-                $result .= "\r\n{$name}: " . implode(', ', $values);
+            if (array_key_exists(strtoupper($name), $this->ignored_headers)) {
+                continue;
             }
+            $result .= "\r\n{$name}: " . implode(', ', $values);
         }
 
         $request = $result . "\r\n\r\n" . $request->getBody();
-        return md5((string)$request) . ".txt";
+        $hash = md5((string)$request) . ".txt";
+        return $hash;
     }
 
     protected function getFullFilePath(RequestInterface $request)
     {
-        return $this->getPath($request) . $this->getFileName($request);
+        $fullFilePath = $this->getPath($request) . $this->getFileName($request);
+        return $fullFilePath;
     }
 }

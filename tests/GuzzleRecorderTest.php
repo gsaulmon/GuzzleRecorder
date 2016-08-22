@@ -69,4 +69,16 @@ class GuzzleRecorderTest extends PHPUnit_Framework_TestCase
         $this->assertSame('0ec133b60aaa14f35d2185c09e590a48.txt', $m->invoke($this->recorder, $request2));
     }
 
+    public function test_get_request_with_query_params()
+    {
+        $request = new Request('GET', 'http://google.com/something/deeper?bogus=param', [
+            'myheader' => 'myvalue',
+            'Cookie' => 'foo'
+        ]);
+
+        $m = new ReflectionMethod($this->recorder, 'getFullFilePath');
+        $m->setAccessible(true);
+
+        $this->assertSame(__DIR__ . '/responses/get/google.com/something_deeper/3cf0ecb906e7a033e8ecc100ba0c00bf.txt', $m->invoke($this->recorder, $request));
+    }
 }
