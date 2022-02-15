@@ -56,7 +56,7 @@ class GuzzleRecorder
 
                 if (file_exists($this->getFullFilePath($request))) {
                     $responsedata = file_get_contents($this->getFullFilePath($request));
-                    $response = \GuzzleHttp\Psr7\parse_response($responsedata);
+                    $response = \GuzzleHttp\Psr7\Message::parseResponse($responsedata);
                     $promise->resolve($response);
                 }
 
@@ -76,7 +76,7 @@ class GuzzleRecorder
                         }
 
                         if(!file_exists($this->getFullFilePath($request))) {
-                            file_put_contents($this->getFullFilePath($request), \GuzzleHttp\Psr7\str($response));
+                            file_put_contents($this->getFullFilePath($request), \GuzzleHttp\Psr7\Message::toString($response));
                         }
 
                         return $response;
